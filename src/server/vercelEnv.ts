@@ -6,11 +6,13 @@
  */
 export function applyVercelEnv(env: NodeJS.ProcessEnv = process.env) {
   if (!env.VERCEL) return
-  // production deploys are served from the stable project url, previews from the branch alias
+  // APP_HOST pins the alias people open (one vercel authentication covers);
+  // otherwise production uses the project url and previews the branch alias
   const host =
-    env.VERCEL_ENV === 'production'
+    env.APP_HOST ||
+    (env.VERCEL_ENV === 'production'
       ? env.VERCEL_PROJECT_PRODUCTION_URL || env.VERCEL_URL
-      : env.VERCEL_BRANCH_URL || env.VERCEL_URL
+      : env.VERCEL_BRANCH_URL || env.VERCEL_URL)
   if (host) {
     const origin = `https://${host}`
     env.BETTER_AUTH_URL ||= origin

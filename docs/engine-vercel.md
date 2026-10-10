@@ -23,9 +23,11 @@ in with the demo account, so it is a demo, never a place for real tax data.
      rewrite to their spa shell, everything else is the 404 page
 
 `src/server/vercelEnv.ts` derives `BETTER_AUTH_URL`, `API_SERVER_URL`,
-`ONE_SERVER_URL` and the `VITE_*` host values from the project production url
-(production deploys) or `VERCEL_BRANCH_URL` (previews), so nothing needs to know
-the deployment url in advance. it also swaps `DATABASE_URL` for
+`ONE_SERVER_URL` and the `VITE_*` host values from `APP_HOST`, else the project
+production url (production deploys) or `VERCEL_BRANCH_URL` (previews). set
+`APP_HOST` to the team-scoped alias (`<project>-<team>.vercel.app`): vercel
+authentication may leave the short `<project>.vercel.app` domain public, and the
+api function answers only on the host auth was built for. it also swaps `DATABASE_URL` for
 `DATABASE_URL_UNPOOLED` when present: row-level security context is set per
 session, which a transaction pooler would break. the package is
 `sideEffects: false`, so it is called explicitly, never imported for effect.
@@ -59,6 +61,7 @@ the region the build logs for the database.
    | `ALLOW_PUBLIC_AUTH`, `VITE_ALLOW_PUBLIC_AUTH` | `1` |
    | `ENGINE_ENABLED`, `VITE_ENGINE_ENABLED` | `1` |
    | `ALLOW_DEMO_AUTH`, `VITE_DEMO_MODE` | `1` |
+   | `APP_HOST` | `mtd-engine-creatorryanberry-6401s-projects.vercel.app` |
    | `ENGINE_SEED_EMAIL` | `demo@straightup.tax` |
    | `ENGINE_SEED_TOKEN` | random; remove it once the workspace is seeded |
 
@@ -73,9 +76,9 @@ the region the build logs for the database.
 
 ## signing in
 
-open the project url, sign in to vercel if asked, then use "try demo" on the
-login screen (or `demo@straightup.tax` with code `000000`). use the project
-url, not a per-commit url: auth trusts only the origin it was built for.
+open `https://<APP_HOST>`, sign in to vercel if asked, then use "try demo" on the
+login screen (or `demo@straightup.tax` with code `000000`). any other
+address loads the pages but its sign-in and api calls are refused.
 
 ## limitations
 

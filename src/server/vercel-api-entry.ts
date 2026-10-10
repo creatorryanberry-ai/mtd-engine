@@ -71,10 +71,30 @@ async function writeResponse(response: Response, res: ServerResponse) {
   res.end()
 }
 
+/**
+ * a project serves several *.vercel.app aliases, and vercel authentication does
+ * not cover all of them. serve the api only on the host auth was built for.
+ */
+function isCanonicalHost(host: string) {
+  const canonical = process.env.BETTER_AUTH_URL
+  if (!canonical) return true
+  try {
+    return new URL(canonical).host === host
+  } catch {
+    return false
+  }
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
     const request = await toRequest(req)
     const url = new URL(request.url)
+    if (!isCanonicalHost(url.host)) {
+      res.statusCode = 404
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ error: 'not found' }))
+      return
+    }
     const response =
       url.pathname === VERCEL_SEED_PATH
         ? await handleVercelDemoSeed(url)
