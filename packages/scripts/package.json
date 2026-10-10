@@ -1,0 +1,36 @@
+{
+  "name": "@mtd/scripts",
+  "version": "0.6.3",
+  "type": "module",
+  "main": "./src/cmd.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/cmd.ts",
+      "default": "./src/cmd.ts"
+    },
+    "./package.json": "./package.json",
+    "./helpers/*": {
+      "types": "./src/helpers/*.ts",
+      "default": "./src/helpers/*.ts"
+    },
+    "./*": {
+      "types": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "lint": "oxlint src",
+    "lint:fix": "oxfmt src && oxlint --fix --fix-suggestions src",
+    "typecheck": "tko run typecheck"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "@mtd/helpers": "workspace:*",
+    "@mtd/run": "workspace:*",
+    "picocolors": "^1.1.1"
+  }
+}

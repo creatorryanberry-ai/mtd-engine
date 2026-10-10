@@ -1,0 +1,38 @@
+diff --git a/dist/client.js b/dist/client.js
+--- a/dist/client.js
++++ b/dist/client.js
+@@ -3,6 +3,7 @@
+ import { SECURE_COOKIE_PREFIX, parseSetCookieHeader, parseSetCookieHeader as parseSetCookieHeader$1, stripSecureCookiePrefix } from "better-auth/cookies";
+ import Constants from "expo-constants";
+ import * as Linking from "expo-linking";
++import * as ExpoWebBrowser from "expo-web-browser";
+ import { AppState, Platform } from "react-native";
+ import { kFocusManager, kOnlineManager } from "better-auth/client";
+ //#region \0rolldown/runtime.js
+@@ -312,24 +313,11 @@
+ 				if (context.data?.redirect && (context.request.url.toString().includes("/sign-in") || context.request.url.toString().includes("/link-social")) && !context.request?.body.includes("idToken")) {
+ 					const to = JSON.parse(context.request.body)?.callbackURL;
+ 					const signInURL = context.data?.url;
+-					let Browser = void 0;
+-					try {
+-						Browser = await import("expo-web-browser");
+-					} catch {
+-						try {
+-							Browser = __require("expo-web-browser");
+-						} catch (error) {
+-							throw new Error("\"expo-web-browser\" is not installed as a dependency!", { cause: error });
+-						}
+-					}
++					const Browser = ExpoWebBrowser;
+ 					if (Platform.OS === "android") try {
+ 						Browser.dismissAuthSession();
+ 					} catch {}
+-					const oauthStateValue = getOAuthStateValue(storage.getItem(cookieName), cookiePrefix);
+-					const params = new URLSearchParams({ authorizationURL: signInURL });
+-					if (oauthStateValue) params.append("oauthState", oauthStateValue);
+-					const proxyURL = `${context.request.baseURL}/expo-authorization-proxy?${params.toString()}`;
+-					const result = await Browser.openAuthSessionAsync(proxyURL, to, opts?.webBrowserOptions);
++					const result = await Browser.openAuthSessionAsync(signInURL, to, opts?.webBrowserOptions);
+ 					if (result.type !== "success") return;
+ 					const cookie = new URL(result.url).searchParams.get("cookie");
+ 					if (!cookie) return;

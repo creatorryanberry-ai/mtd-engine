@@ -1,0 +1,1 @@
+ALTER TABLE "categorisationRule" ADD COLUMN "friendlyName" text;

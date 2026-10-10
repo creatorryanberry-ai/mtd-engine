@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /home/
+Disallow: /profile/
+Disallow: /search/
+Disallow: /plus/
+Disallow: /settings/
+Disallow: /api/
+Disallow: /login
+Disallow: /signup/
+Disallow: /avatar-setup
+Disallow: /profile-setup
+
+Sitemap: https://straightup.tax/sitemap.xml

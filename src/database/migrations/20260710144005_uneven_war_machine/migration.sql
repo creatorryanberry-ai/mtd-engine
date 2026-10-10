@@ -1,0 +1,1 @@
+ALTER TABLE "mtdTransaction" ADD COLUMN "attachmentUrl" text;

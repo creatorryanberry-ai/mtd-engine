@@ -1,0 +1,83 @@
+node_modules
+test-results
+
+ios/**
+android/**
+
+packages/*/types
+
+tmp-data
+
+# keep types in repo to track them
+# **/types/**/*.d.ts
+# but map can be ignored and just published on npm
+**/types/**/*.d.ts.map
+
+tmp
+.worktrees
+dist
+.DS_Store
+.ultra.cache.json
+*.tsbuildinfo
+
+.build
+/build/ios
+/build/android
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+.tamagui
+
+# claude code skills are generated symlinks into ./docs but kept in the repo
+# (run `bun tko skills generate` to regenerate)
+
+.env
+.env.development
+.env.production
+.env.staging
+
+# local env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.backup
+.env.ios
+.env.android
+/vendor/bundle
+
+.expo
+
+# test output
+.output
+.vercel
+src/test/playwright-report
+src/test/test-results
+
+# Logs
+.logs/
+
+.watchman*
+
+# Docker volume data
+.docker
+.vxrn-entry-native.tsx
+
+storybook-static
+.env.development
+src/uncloud/docker-compose.processed.yml
+.claude/settings.local.json
+
+
+curator-mtd-play-api.json
+curator-mtd-play-api*.json
+curator-mtd-upload.jks
+*.p8
+.superpowers/
+
+# local api deploy fingerprint state
+.mtd/
+
+# cloudflare origin ca (private key + cert) — deploy copies these onto the vm
+src/uncloud/certs/

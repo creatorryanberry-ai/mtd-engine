@@ -1,0 +1,59 @@
+diff --git a/plugins/withMlkitSimulatorArm64Fix.js b/plugins/withMlkitSimulatorArm64Fix.js
+index dc07fd1cfeb8d67bc254dd718751e1a2148659f8..983bf1d346f1bd6cac4ec66cba35aaa7e7853381 100644
+--- a/plugins/withMlkitSimulatorArm64Fix.js
++++ b/plugins/withMlkitSimulatorArm64Fix.js
+@@ -42,12 +42,51 @@ function indentLines(lines, indent) {
+     .join("\n");
+ }
+ 
++function findMatchingEnd(podfile, keywordStart) {
++  let depth = 0;
++  let i = keywordStart;
++  while (i < podfile.length) {
++    const lineEnd = podfile.indexOf("\n", i);
++    const line = podfile.slice(i, lineEnd === -1 ? podfile.length : lineEnd);
++    const trimmed = line.trim();
++    if (
++      /^(if|unless|while|until|case|begin|def|class|module)\b/.test(trimmed) ||
++      /\bdo\b/.test(trimmed)
++    ) {
++      depth++;
++    }
++    if (/^end\b/.test(trimmed)) {
++      depth--;
++      if (depth === 0) {
++        return lineEnd === -1 ? podfile.length : lineEnd + 1;
++      }
++    }
++    if (lineEnd === -1) break;
++    i = lineEnd + 1;
++  }
++  return -1;
++}
++
+ function stripPreviouslyInjectedBlock(podfile) {
+   // Remove a previously injected block that might have ended up outside `post_install`.
++  // Must consume the whole `if ENV['EXPO_MLKIT_OCR_DISABLE_MLKIT']` block, not the
++  // first inner `end` — a non-greedy match left extra `end`s in the Podfile.
+   const escapedMarker = MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+-  const blockRegex =
+-    new RegExp(`\\n\\s*#\\s*${escapedMarker}[\\s\\S]*?\\n\\s*end\\n`, "g");
+-  return podfile.replace(blockRegex, "\n");
++  const markerRegex = new RegExp(`\\n\\s*#\\s*${escapedMarker}`);
++  let next = podfile;
++  for (let safety = 0; safety < 8; safety++) {
++    const markerMatch = next.match(markerRegex);
++    if (!markerMatch || markerMatch.index == null) break;
++    const start = markerMatch.index;
++    const afterMarker = next.slice(start);
++    const ifMatch = afterMarker.match(/if ENV\['EXPO_MLKIT_OCR_DISABLE_MLKIT'\]/);
++    if (!ifMatch || ifMatch.index == null) break;
++    const ifStart = start + ifMatch.index;
++    const endAt = findMatchingEnd(next, ifStart);
++    if (endAt === -1) break;
++    next = `${next.slice(0, start)}\n${next.slice(endAt)}`;
++  }
++  return next;
+ }
+ 
+ function ensurePatchInsidePostInstall(podfile) {

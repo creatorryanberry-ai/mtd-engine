@@ -1,0 +1,37 @@
+{
+  "name": "@mtd/env",
+  "version": "0.6.3",
+  "type": "module",
+  "sideEffects": false,
+  "source": "src/index.ts",
+  "main": "dist/cjs",
+  "module": "dist/esm",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "dist",
+    "types"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "bun": "./src/index.ts",
+      "react-native": "./dist/esm/index.native.js",
+      "types": "./src/index.ts",
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.cjs",
+      "default": "./dist/esm/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tamagui-build",
+    "watch": "tamagui-build --watch",
+    "clean": "tamagui-build clean",
+    "clean:build": "tamagui-build clean:build"
+  },
+  "author": "Nate Wienert",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

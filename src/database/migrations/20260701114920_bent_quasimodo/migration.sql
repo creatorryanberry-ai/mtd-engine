@@ -1,0 +1,1 @@
+ALTER TABLE "hmrcOAuthState" ADD COLUMN "nino" text NOT NULL;

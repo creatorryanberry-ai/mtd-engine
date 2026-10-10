@@ -1,0 +1,17 @@
+# fastlane match — certificates/profiles in a private git repo (match branch)
+# required env validated in Fastfile lanes (not here) so android-only runs work
+
+git_url(ENV["APPLE_CODE_SIGNING_GIT_URL"].to_s)
+git_branch("match")
+
+storage_mode("git")
+
+type("appstore")
+
+identifiers = ENV["IOS_BUNDLE_ID"].to_s
+if ENV["IOS_EXTENSION_BUNDLE_ID"].to_s != ""
+  identifiers = [ENV["IOS_BUNDLE_ID"], ENV["IOS_EXTENSION_BUNDLE_ID"]]
+end
+app_identifier(identifiers) unless identifiers.to_s.empty?
+
+team_id(ENV["APPLE_DEVELOPER_TEAM_ID"].to_s) unless ENV["APPLE_DEVELOPER_TEAM_ID"].to_s.empty?

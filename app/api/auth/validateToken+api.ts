@@ -1,0 +1,24 @@
+import { isValidJWT } from '@mtd/better-auth-utils/server'
+
+import { server } from '~/env'
+
+import type { Endpoint } from 'one'
+
+// endpoint for native apps to validate JWT tokens
+export const POST: Endpoint = async (req) => {
+  const body = await req.json()
+  if (body && typeof body.token === 'string') {
+    try {
+      const valid = await isValidJWT(body.token, {
+        baseUrl: server.ONE_SERVER_URL,
+        forceIssuer: process.env.FORCE_ISSUER,
+      })
+      return Response.json({ valid })
+    } catch (err) {
+      console.error(`Error validating token`, err)
+    }
+    return Response.json({ valid: false })
+  }
+
+  return Response.json({ valid: false })
+}

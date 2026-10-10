@@ -1,0 +1,6 @@
+# origin ca certificates for cloudflare proxied domains
+# auto-generated during deploy from VITE_WEB_HOSTNAME env vars
+
+staging-api.straightup.tax {
+	tls /config/certs/origin.pem /config/certs/origin.key
+}

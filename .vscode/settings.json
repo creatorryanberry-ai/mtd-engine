@@ -1,0 +1,9 @@
+{
+  "sonarlint.analysisExcludesStandalone": "**/*",
+  "jira-plugin.workingProject": "",
+  "java.import.gradle.enabled": false,
+  "java.import.maven.enabled": false,
+  "java.project.importOnFirstTimeStartup": "disabled",
+  "java.configuration.updateBuildConfiguration": "disabled",
+  "java.import.generatesMetadataFilesAtProjectRoot": false
+}

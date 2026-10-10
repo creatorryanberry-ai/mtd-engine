@@ -1,0 +1,3 @@
+{
+  "unwantedRecommendations": ["SonarSource.sonarlint-vscode"]
+}

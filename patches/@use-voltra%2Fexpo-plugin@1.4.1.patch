@@ -1,0 +1,353 @@
+diff --git a/build/cjs/ios-widget/xcode/buildPhases.js b/build/cjs/ios-widget/xcode/buildPhases.js
+index 4aa9443321bf201f1c9aeaca68ef2e0a831a8359..6a6330c9fd9f3eb21734c56704bf0be3079ead17 100644
+--- a/build/cjs/ios-widget/xcode/buildPhases.js
++++ b/build/cjs/ios-widget/xcode/buildPhases.js
+@@ -37,6 +37,21 @@ exports.addBuildPhases = addBuildPhases;
+ exports.ensureBuildPhases = ensureBuildPhases;
+ const util = __importStar(require("util"));
+ const pbxFile = require('xcode/lib/pbxFile');
++function findExistingEmbedExtensionsPhase(xcodeProject, targetUuid) {
++    const nativeTargets = xcodeProject.pbxNativeTargetSection();
++    const target = nativeTargets[targetUuid];
++    if (!target?.buildPhases) {
++        return null;
++    }
++    const copyFilesSection = xcodeProject.hash.project.objects['PBXCopyFilesBuildPhase'] || {};
++    for (const entry of target.buildPhases) {
++        const phase = copyFilesSection[entry.value];
++        if (phase && String(phase.dstSubfolderSpec) === '13') {
++            return { phase, name: entry.comment || phase.name };
++        }
++    }
++    return null;
++}
+ /**
+  * Adds all required build phases for the widget extension target.
+  */
+@@ -44,16 +59,22 @@ function addBuildPhases(xcodeProject, options) {
+     const { targetUuid, groupName, productFile, widgetFiles } = options;
+     const buildPath = `""`;
+     const folderType = 'app_extension';
++    const mainTargetUuid = xcodeProject.getFirstTarget().uuid;
+     const { swiftFiles, intentFiles, assetDirectories } = widgetFiles;
+     // Sources build phase
+     xcodeProject.addBuildPhase([...swiftFiles, ...intentFiles], 'PBXSourcesBuildPhase', 'Sources', targetUuid, folderType, buildPath);
+-    // Copy files build phase
+-    xcodeProject.addBuildPhase([], 'PBXCopyFilesBuildPhase', groupName, xcodeProject.getFirstTarget().uuid, folderType, buildPath);
+-    xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, productFile.target).files.push({
+-        value: productFile.uuid,
+-        comment: util.format('%s in %s', productFile.basename, productFile.group),
+-    });
+-    xcodeProject.addToPbxBuildFileSection(productFile);
++    const existing = findExistingEmbedExtensionsPhase(xcodeProject, mainTargetUuid);
++    if (existing) {
++        ensureCopyFilesPhaseProduct(xcodeProject, existing.phase, productFile);
++    }
++    else {
++        xcodeProject.addBuildPhase([], 'PBXCopyFilesBuildPhase', groupName, mainTargetUuid, folderType, buildPath);
++        xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, productFile.target).files.push({
++            value: productFile.uuid,
++            comment: util.format('%s in %s', productFile.basename, productFile.group),
++        });
++        xcodeProject.addToPbxBuildFileSection(productFile);
++    }
+     // Frameworks build phase
+     xcodeProject.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid, folderType, buildPath);
+     // Resources build phase
+@@ -80,8 +101,8 @@ function ensureBuildPhases(xcodeProject, options) {
+     if (sourcesPhase) {
+         ensureBuildPhaseFiles(xcodeProject, sourcesPhase, [...swiftFiles, ...intentFiles]);
+     }
+-    // Copy files build phase (embed extension into main app)
+-    let copyFilesPhase = xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, mainTargetUuid);
++    const existing = findExistingEmbedExtensionsPhase(xcodeProject, mainTargetUuid);
++    let copyFilesPhase = existing ? existing.phase : xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, mainTargetUuid);
+     if (!copyFilesPhase) {
+         xcodeProject.addBuildPhase([], 'PBXCopyFilesBuildPhase', groupName, mainTargetUuid, folderType, buildPath);
+         copyFilesPhase = xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, mainTargetUuid);
+@@ -187,11 +208,17 @@ function ensureFileReference(xcodeProject, filePath) {
+     xcodeProject.addToPbxFileReferenceSection(file);
+     return { fileRef: file.fileRef, basename: file.basename, group: file.group };
+ }
+-function ensureBuildFile(xcodeProject, filePath) {
++function ensureBuildFile(xcodeProject, filePath, buildPhase) {
+     const fileReference = ensureFileReference(xcodeProject, filePath);
+-    const existingBuildFile = findBuildFileKeyByFileRef(xcodeProject, fileReference.fileRef);
+-    if (existingBuildFile) {
+-        return { uuid: existingBuildFile, ...fileReference };
++    if (buildPhase?.files) {
++        const buildFileSection = xcodeProject.pbxBuildFileSection();
++        const existingInPhase = buildPhase.files.find((entry) => {
++            const bf = buildFileSection[entry.value];
++            return bf?.fileRef === fileReference.fileRef;
++        });
++        if (existingInPhase) {
++            return { uuid: existingInPhase.value, ...fileReference };
++        }
+     }
+     const file = new pbxFile(filePath);
+     file.uuid = xcodeProject.generateUuid();
+@@ -218,7 +245,7 @@ function ensureBuildPhaseFiles(xcodeProject, buildPhase, filePaths) {
+         if (buildPhaseHasFile(xcodeProject, buildPhase, fileReference.fileRef)) {
+             continue;
+         }
+-        const buildFile = ensureBuildFile(xcodeProject, filePath);
++        const buildFile = ensureBuildFile(xcodeProject, filePath, buildPhase);
+         buildPhase.files.push({
+             value: buildFile.uuid,
+             comment: util.format('%s in %s', buildFile.basename, buildFile.group),
+@@ -229,16 +256,28 @@ function ensureCopyFilesPhaseProduct(xcodeProject, buildPhase, productFile) {
+     if (!buildPhase.files) {
+         buildPhase.files = [];
+     }
+-    const alreadyExists = buildPhase.files.some((entry) => entry.value === productFile.uuid);
+-    if (alreadyExists) {
++    const buildFileSection = xcodeProject.pbxBuildFileSection();
++    const alreadyInPhase = buildPhase.files.some((entry) => {
++        const bf = buildFileSection[entry.value];
++        return bf?.fileRef === productFile.fileRef;
++    });
++    if (alreadyInPhase) {
+         return;
+     }
+-    const buildFileSection = xcodeProject.pbxBuildFileSection();
+-    if (!buildFileSection[productFile.uuid]) {
++    const isUsedElsewhere = buildFileSection[productFile.uuid];
++    let useUuid = productFile.uuid;
++    if (isUsedElsewhere) {
++        useUuid = xcodeProject.generateUuid();
++        xcodeProject.addToPbxBuildFileSection({
++            ...productFile,
++            uuid: useUuid,
++        });
++    }
++    else {
+         xcodeProject.addToPbxBuildFileSection(productFile);
+     }
+     buildPhase.files.push({
+-        value: productFile.uuid,
++        value: useUuid,
+         comment: util.format('%s in %s', productFile.basename, productFile.group),
+     });
+ }
+diff --git a/build/cjs/ios-widget/xcode/groups.js b/build/cjs/ios-widget/xcode/groups.js
+index 7627ea897a47ce660bc9c441d3ce114c645c30eb..c769348bcc09b6fd326c9a054baf4ecc229e70d7 100644
+--- a/build/cjs/ios-widget/xcode/groups.js
++++ b/build/cjs/ios-widget/xcode/groups.js
+@@ -9,17 +9,30 @@ const pbxFile = require('xcode/lib/pbxFile');
+ function addPbxGroup(xcodeProject, options) {
+     const { targetName, widgetFiles } = options;
+     const { swiftFiles, intentFiles, assetDirectories, entitlementFiles, plistFiles } = widgetFiles;
+-    // Add PBX group with all widget files
+-    const { uuid: pbxGroupUuid } = xcodeProject.addPbxGroup([...swiftFiles, ...intentFiles, ...entitlementFiles, ...plistFiles, ...assetDirectories], targetName, targetName);
+-    // Add PBXGroup to top level group
+-    const groups = xcodeProject.hash.project.objects['PBXGroup'];
+-    if (pbxGroupUuid) {
+-        Object.keys(groups).forEach(function (key) {
+-            if (groups[key].name === undefined && groups[key].path === undefined) {
+-                xcodeProject.addToPbxGroup(pbxGroupUuid, key);
+-            }
+-        });
++    const allFiles = [...swiftFiles, ...intentFiles, ...entitlementFiles, ...plistFiles, ...assetDirectories];
++    const pbxGroupUuid = xcodeProject.generateUuid();
++    const pbxGroup = {
++        isa: 'PBXGroup',
++        children: [],
++        name: targetName,
++        path: targetName,
++        sourceTree: '"<group>"',
++    };
++    for (const filePath of allFiles) {
++        const fileRef = ensureFileReference(xcodeProject, filePath);
++        const file = new pbxFile(filePath);
++        pbxGroup.children.push({ value: fileRef, comment: file.basename });
+     }
++    const groups = xcodeProject.hash.project.objects['PBXGroup'];
++    groups[pbxGroupUuid] = pbxGroup;
++    groups[`${pbxGroupUuid}_comment`] = targetName;
++    Object.keys(groups).forEach(function (key) {
++        if (/_comment$/.test(key))
++            return;
++        if (groups[key].name === undefined && groups[key].path === undefined) {
++            xcodeProject.addToPbxGroup(pbxGroupUuid, key);
++        }
++    });
+ }
+ /**
+  * Ensures a PBXGroup exists for the widget extension files.
+diff --git a/build/esm/ios-widget/xcode/buildPhases.js b/build/esm/ios-widget/xcode/buildPhases.js
+index fc659cdd465571ddd35ed98533202b5b94aaa874..eef5a219940028f4751424fce63b6affa44a9ce4 100644
+--- a/build/esm/ios-widget/xcode/buildPhases.js
++++ b/build/esm/ios-widget/xcode/buildPhases.js
+@@ -1,5 +1,20 @@
+ import * as util from 'util';
+ const pbxFile = require('xcode/lib/pbxFile');
++function findExistingEmbedExtensionsPhase(xcodeProject, targetUuid) {
++    const nativeTargets = xcodeProject.pbxNativeTargetSection();
++    const target = nativeTargets[targetUuid];
++    if (!target?.buildPhases) {
++        return null;
++    }
++    const copyFilesSection = xcodeProject.hash.project.objects['PBXCopyFilesBuildPhase'] || {};
++    for (const entry of target.buildPhases) {
++        const phase = copyFilesSection[entry.value];
++        if (phase && String(phase.dstSubfolderSpec) === '13') {
++            return { phase, name: entry.comment || phase.name };
++        }
++    }
++    return null;
++}
+ /**
+  * Adds all required build phases for the widget extension target.
+  */
+@@ -7,16 +22,22 @@ export function addBuildPhases(xcodeProject, options) {
+     const { targetUuid, groupName, productFile, widgetFiles } = options;
+     const buildPath = `""`;
+     const folderType = 'app_extension';
++    const mainTargetUuid = xcodeProject.getFirstTarget().uuid;
+     const { swiftFiles, intentFiles, assetDirectories } = widgetFiles;
+     // Sources build phase
+     xcodeProject.addBuildPhase([...swiftFiles, ...intentFiles], 'PBXSourcesBuildPhase', 'Sources', targetUuid, folderType, buildPath);
+-    // Copy files build phase
+-    xcodeProject.addBuildPhase([], 'PBXCopyFilesBuildPhase', groupName, xcodeProject.getFirstTarget().uuid, folderType, buildPath);
+-    xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, productFile.target).files.push({
+-        value: productFile.uuid,
+-        comment: util.format('%s in %s', productFile.basename, productFile.group),
+-    });
+-    xcodeProject.addToPbxBuildFileSection(productFile);
++    const existing = findExistingEmbedExtensionsPhase(xcodeProject, mainTargetUuid);
++    if (existing) {
++        ensureCopyFilesPhaseProduct(xcodeProject, existing.phase, productFile);
++    }
++    else {
++        xcodeProject.addBuildPhase([], 'PBXCopyFilesBuildPhase', groupName, mainTargetUuid, folderType, buildPath);
++        xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, productFile.target).files.push({
++            value: productFile.uuid,
++            comment: util.format('%s in %s', productFile.basename, productFile.group),
++        });
++        xcodeProject.addToPbxBuildFileSection(productFile);
++    }
+     // Frameworks build phase
+     xcodeProject.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', targetUuid, folderType, buildPath);
+     // Resources build phase
+@@ -43,8 +64,8 @@ export function ensureBuildPhases(xcodeProject, options) {
+     if (sourcesPhase) {
+         ensureBuildPhaseFiles(xcodeProject, sourcesPhase, [...swiftFiles, ...intentFiles]);
+     }
+-    // Copy files build phase (embed extension into main app)
+-    let copyFilesPhase = xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, mainTargetUuid);
++    const existing = findExistingEmbedExtensionsPhase(xcodeProject, mainTargetUuid);
++    let copyFilesPhase = existing ? existing.phase : xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, mainTargetUuid);
+     if (!copyFilesPhase) {
+         xcodeProject.addBuildPhase([], 'PBXCopyFilesBuildPhase', groupName, mainTargetUuid, folderType, buildPath);
+         copyFilesPhase = xcodeProject.buildPhaseObject('PBXCopyFilesBuildPhase', groupName, mainTargetUuid);
+@@ -150,11 +171,17 @@ function ensureFileReference(xcodeProject, filePath) {
+     xcodeProject.addToPbxFileReferenceSection(file);
+     return { fileRef: file.fileRef, basename: file.basename, group: file.group };
+ }
+-function ensureBuildFile(xcodeProject, filePath) {
++function ensureBuildFile(xcodeProject, filePath, buildPhase) {
+     const fileReference = ensureFileReference(xcodeProject, filePath);
+-    const existingBuildFile = findBuildFileKeyByFileRef(xcodeProject, fileReference.fileRef);
+-    if (existingBuildFile) {
+-        return { uuid: existingBuildFile, ...fileReference };
++    if (buildPhase?.files) {
++        const buildFileSection = xcodeProject.pbxBuildFileSection();
++        const existingInPhase = buildPhase.files.find((entry) => {
++            const bf = buildFileSection[entry.value];
++            return bf?.fileRef === fileReference.fileRef;
++        });
++        if (existingInPhase) {
++            return { uuid: existingInPhase.value, ...fileReference };
++        }
+     }
+     const file = new pbxFile(filePath);
+     file.uuid = xcodeProject.generateUuid();
+@@ -181,7 +208,7 @@ function ensureBuildPhaseFiles(xcodeProject, buildPhase, filePaths) {
+         if (buildPhaseHasFile(xcodeProject, buildPhase, fileReference.fileRef)) {
+             continue;
+         }
+-        const buildFile = ensureBuildFile(xcodeProject, filePath);
++        const buildFile = ensureBuildFile(xcodeProject, filePath, buildPhase);
+         buildPhase.files.push({
+             value: buildFile.uuid,
+             comment: util.format('%s in %s', buildFile.basename, buildFile.group),
+@@ -192,16 +219,28 @@ function ensureCopyFilesPhaseProduct(xcodeProject, buildPhase, productFile) {
+     if (!buildPhase.files) {
+         buildPhase.files = [];
+     }
+-    const alreadyExists = buildPhase.files.some((entry) => entry.value === productFile.uuid);
+-    if (alreadyExists) {
++    const buildFileSection = xcodeProject.pbxBuildFileSection();
++    const alreadyInPhase = buildPhase.files.some((entry) => {
++        const bf = buildFileSection[entry.value];
++        return bf?.fileRef === productFile.fileRef;
++    });
++    if (alreadyInPhase) {
+         return;
+     }
+-    const buildFileSection = xcodeProject.pbxBuildFileSection();
+-    if (!buildFileSection[productFile.uuid]) {
++    const isUsedElsewhere = buildFileSection[productFile.uuid];
++    let useUuid = productFile.uuid;
++    if (isUsedElsewhere) {
++        useUuid = xcodeProject.generateUuid();
++        xcodeProject.addToPbxBuildFileSection({
++            ...productFile,
++            uuid: useUuid,
++        });
++    }
++    else {
+         xcodeProject.addToPbxBuildFileSection(productFile);
+     }
+     buildPhase.files.push({
+-        value: productFile.uuid,
++        value: useUuid,
+         comment: util.format('%s in %s', productFile.basename, productFile.group),
+     });
+ }
+diff --git a/build/esm/ios-widget/xcode/groups.js b/build/esm/ios-widget/xcode/groups.js
+index 1f4c3b4cc6730570e0fb183c1ecb81a43a68b353..77f23160ee0cda755fb4d0f8a64f96b8225ee7f1 100644
+--- a/build/esm/ios-widget/xcode/groups.js
++++ b/build/esm/ios-widget/xcode/groups.js
+@@ -5,17 +5,30 @@ const pbxFile = require('xcode/lib/pbxFile');
+ export function addPbxGroup(xcodeProject, options) {
+     const { targetName, widgetFiles } = options;
+     const { swiftFiles, intentFiles, assetDirectories, entitlementFiles, plistFiles } = widgetFiles;
+-    // Add PBX group with all widget files
+-    const { uuid: pbxGroupUuid } = xcodeProject.addPbxGroup([...swiftFiles, ...intentFiles, ...entitlementFiles, ...plistFiles, ...assetDirectories], targetName, targetName);
+-    // Add PBXGroup to top level group
+-    const groups = xcodeProject.hash.project.objects['PBXGroup'];
+-    if (pbxGroupUuid) {
+-        Object.keys(groups).forEach(function (key) {
+-            if (groups[key].name === undefined && groups[key].path === undefined) {
+-                xcodeProject.addToPbxGroup(pbxGroupUuid, key);
+-            }
+-        });
++    const allFiles = [...swiftFiles, ...intentFiles, ...entitlementFiles, ...plistFiles, ...assetDirectories];
++    const pbxGroupUuid = xcodeProject.generateUuid();
++    const pbxGroup = {
++        isa: 'PBXGroup',
++        children: [],
++        name: targetName,
++        path: targetName,
++        sourceTree: '"<group>"',
++    };
++    for (const filePath of allFiles) {
++        const fileRef = ensureFileReference(xcodeProject, filePath);
++        const file = new pbxFile(filePath);
++        pbxGroup.children.push({ value: fileRef, comment: file.basename });
+     }
++    const groups = xcodeProject.hash.project.objects['PBXGroup'];
++    groups[pbxGroupUuid] = pbxGroup;
++    groups[`${pbxGroupUuid}_comment`] = targetName;
++    Object.keys(groups).forEach(function (key) {
++        if (/_comment$/.test(key))
++            return;
++        if (groups[key].name === undefined && groups[key].path === undefined) {
++            xcodeProject.addToPbxGroup(pbxGroupUuid, key);
++        }
++    });
+ }
+ /**
+  * Ensures a PBXGroup exists for the widget extension files.

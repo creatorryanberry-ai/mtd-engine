@@ -1,0 +1,1 @@
+ALTER TABLE "userState" ADD COLUMN "hasOnboarded" boolean DEFAULT false NOT NULL;

@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint"],
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "vars": "local",
+        "args": "none",
+        "caughtErrors": "none",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "**/.claude/**",
+    "**/*.generated.js",
+    "**/.tamagui/**",
+    "**/tmp-data/**",
+    "**/.build/**",
+    "storage/**",
+    "**/.output/**",
+    "**/.vercel/**",
+    "**/migrations/meta/**",
+    "src/database/migrations/**",
+    "**/themes-out.ts",
+    "**/*.d.ts",
+    "**/ios/**",
+    "**/android/**",
+    "**/dist/**",
+    "**/.docker/**",
+    "**/.dist/**",
+    "src/data/generated/**",
+    "**/.frontend.tsx",
+    "**/.backend.tsx"
+  ]
+}

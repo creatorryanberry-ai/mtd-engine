@@ -1,0 +1,1 @@
+CREATE INDEX "engineOutcome_contact_occurred_idx" ON "engineOutcome" ("contactId","occurredAt");

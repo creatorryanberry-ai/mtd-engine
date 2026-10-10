@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Straight Up Tax API</title>
+    <style>
+      html,
+      body,
+      #app {
+        margin: 0;
+        height: 100%;
+      }
+
+      .access-logout {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 10000;
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid #d0d0d0;
+        background: #fff;
+        color: #111;
+        font: 13px/1.2 system-ui, sans-serif;
+        text-decoration: none;
+        box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+      }
+
+      .access-logout:hover {
+        background: #f5f5f5;
+      }
+
+      /*
+        hide tag/path intro sections (heading + description + ops list card).
+        keep the introduction and real operation sections (those have .operation-layout
+        and the method badge).
+      */
+      .section:not(.introduction-section):not(:has(.operation-layout)) {
+        display: none !important;
+      }
+
+      /*
+        collapsed tags render a "Show more" stub in .tag-section-container (not .section).
+        with many path-level tags that stacks into a wall of buttons — hide those stubs;
+        expanding a route (sidebar click) mounts real .operation-layout content instead.
+      */
+      .tag-section-container:not(:has(.operation-layout)) {
+        display: none !important;
+      }
+
+      button.show-more {
+        display: none !important;
+      }
+
+      /*
+        hide empty Operations cards if a tag section still renders.
+        scalar's ScalarCard drops the endpoints-card class, so key off the list markup.
+      */
+      .scalar-card:has(ul.endpoints):not(:has(a.endpoint)) {
+        display: none !important;
+      }
+
+      /*
+        nested path tags live inside the domain tag-section-container; Scalar adds
+        another 60px horizontal padding per section-container, which indents /me etc.
+      */
+      .section-container .section-container,
+      .tag-section-container .tag-section-container {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      /*
+        Scalar pins .operation-title to grid-area:heading (left half of 1fr|1fr).
+        Those scoped rules load after this file — override with !important so the
+        method badge + full route stay on one line across the content width.
+      */
+      .operation-layout {
+        position: relative;
+      }
+
+      /*
+        when a human summary is hoisted above the two-column body, pin areas so
+        examples line up with the description body (not the summary line).
+      */
+      .operation-layout:has(> .operation-summary) {
+        grid-template-areas:
+          'heading heading'
+          'summary summary'
+          'description examples'
+          'details examples' !important;
+        grid-template-columns: 1fr 1fr !important;
+        column-gap: 48px !important;
+      }
+
+      .operation-layout > .operation-title {
+        grid-area: heading !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center;
+        gap: 0.65rem;
+        min-width: 0;
+        width: 100%;
+        margin-bottom: 0 !important;
+      }
+
+      /* desktop: auth sits at the end of the route title row */
+      .operation-layout:has(> .operation-auth:not(:empty)) > .operation-title {
+        padding-right: 8rem;
+      }
+
+      .operation-layout > .operation-auth {
+        grid-area: heading !important;
+        justify-self: end !important;
+        align-self: start !important;
+        margin-top: 0.2rem;
+        z-index: 1;
+      }
+
+      /*
+        sidebar ops: nav title is "GET /api/..." for the sticky header; hide that
+        label next to Scalar's method badge so the sidebar stays verb-only.
+      */
+      .t-doc__sidebar .group\/button:has(.sidebar-heading-type) .group\/button-label {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+
+      /* mobile sticky header can show long /api/... paths */
+      .t-doc__header .flex-1.text-sm.font-medium {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* subtitle under the route title; larger gap before description + examples */
+      .operation-layout > .operation-summary {
+        grid-area: summary !important;
+        margin: 0.15rem 0 1.75rem;
+        color: var(--scalar-color-2, #696969);
+        font-size: var(--scalar-font-size-4, 0.95rem);
+        font-weight: 500;
+        font-style: italic;
+        line-height: 1.35;
+        letter-spacing: 0.005em;
+      }
+
+      .operation-layout > .operation-summary p {
+        margin: 0;
+      }
+
+      .operation-layout > .operation-description {
+        grid-area: description !important;
+      }
+
+      .operation-layout > .examples {
+        grid-area: examples !important;
+      }
+
+      .operation-layout > .operation-details {
+        grid-area: details !important;
+      }
+
+      /*
+        must match/exceed desktop :has(> .operation-summary) specificity, or the
+        1fr 1fr columns stick and single-token areas only fill the left half —
+        which also makes the method badge look like it isn't inline with the path.
+      */
+      @container narrow-references-container (max-width: 900px) {
+        .operation-layout,
+        .operation-layout:has(> .operation-summary) {
+          grid-template-columns: 1fr !important;
+          column-gap: 0 !important;
+        }
+
+        .operation-layout:has(> .operation-summary) {
+          grid-template-areas:
+            'auth'
+            'heading'
+            'summary'
+            'description'
+            'examples'
+            'details' !important;
+        }
+
+        .operation-layout:not(:has(> .operation-summary)) {
+          grid-template-areas:
+            'auth'
+            'heading'
+            'description'
+            'examples'
+            'details' !important;
+        }
+
+        .operation-layout > .operation-title,
+        .operation-layout > .operation-summary,
+        .operation-layout > .operation-description,
+        .operation-layout > .examples,
+        .operation-layout > .operation-details,
+        .operation-layout > .operation-auth {
+          grid-column: 1 / -1 !important;
+          max-width: none !important;
+          width: 100% !important;
+        }
+
+        /* auth on its own row above the method + path */
+        .operation-layout > .operation-auth {
+          grid-area: auth !important;
+          justify-self: start !important;
+          align-self: start !important;
+          width: auto !important;
+          margin: 0 0 0.5rem;
+        }
+
+        .operation-layout:has(> .operation-auth:not(:empty)) > .operation-title {
+          padding-right: 0 !important;
+        }
+      }
+
+      /* fallback when the references container query doesn't fire */
+      @media (max-width: 900px) {
+        .operation-layout,
+        .operation-layout:has(> .operation-summary) {
+          grid-template-columns: 1fr !important;
+          column-gap: 0 !important;
+        }
+
+        .operation-layout:has(> .operation-summary) {
+          grid-template-areas:
+            'auth'
+            'heading'
+            'summary'
+            'description'
+            'examples'
+            'details' !important;
+        }
+
+        .operation-layout:not(:has(> .operation-summary)) {
+          grid-template-areas:
+            'auth'
+            'heading'
+            'description'
+            'examples'
+            'details' !important;
+        }
+
+        .operation-layout > .operation-title,
+        .operation-layout > .operation-summary,
+        .operation-layout > .operation-description,
+        .operation-layout > .examples,
+        .operation-layout > .operation-details,
+        .operation-layout > .operation-auth {
+          grid-column: 1 / -1 !important;
+          max-width: none !important;
+          width: 100% !important;
+        }
+
+        .operation-layout > .operation-auth {
+          grid-area: auth !important;
+          justify-self: start !important;
+          align-self: start !important;
+          width: auto !important;
+          margin: 0 0 0.5rem;
+        }
+
+        .operation-layout:has(> .operation-auth:not(:empty)) > .operation-title {
+          padding-right: 0 !important;
+        }
+      }
+
+      .operation-title > .badge {
+        flex-shrink: 0;
+        font-family: var(--scalar-font-code, ui-monospace, monospace);
+        font-size: 0.75rem;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        line-height: 1.2;
+      }
+
+      .operation-title > :not(.badge) {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-wrap: normal;
+        word-break: normal;
+        line-break: auto;
+      }
+
+      .operation-title h1,
+      .operation-title h2,
+      .operation-title h3,
+      .operation-title a {
+        overflow-wrap: normal !important;
+        word-break: normal !important;
+        line-break: auto !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+# logs in as the demo user via the "Login as Demo User" quick-login button.
+# the demo button is only visible in dev/demo builds (isDemoMode = true).
+# credentials: demo@straightup.tax / demopassword123
+appId: tax.straightup.preview
+tags:
+  - auth
+---
+- runFlow: OpenApp.yaml
+
+# wait for login screen buttons to appear
+- assertVisible: 'Continue with Email'
+
+# tap the demo login button (fastest path - no OTP or password entry required)
+- tapOn: 'Login as Demo User'
+
+# complete required business setup after first sign-in
+- extendedWaitUntil:
+    visible: 'Set up your business'
+    timeout: 30000
+- tapOn:
+    id: business-setup-name
+- inputText: 'Demo Business'
+- tapOn:
+    id: business-setup-start-date
+- runFlow:
+    when:
+      platform: ios
+    commands:
+      - tapOn:
+          id: business-setup-date-done
+- runFlow:
+    when:
+      platform: android
+    commands:
+      - tapOn: OK
+- tapOn:
+    id: business-setup-description
+- inputText: 'General contracting services'
+- tapOn: 'Self-employed'
+- tapOn: 'No'
+- tapOn: 'Mileage'
+- tapOn:
+    id: business-setup-submit
+
+# wait for the feed header to appear, confirming successful login
+- extendedWaitUntil:
+    visible: 'Straight Up Tax'
+    timeout: 30000
+
+# confirm we are no longer on the login screen
+- assertNotVisible: 'Continue with Email'
