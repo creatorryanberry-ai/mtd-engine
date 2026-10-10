@@ -1,3 +1,4 @@
+import { handleVercelDemoSeed, VERCEL_SEED_PATH } from './vercelDemoSeed'
 import { applyVercelEnv } from './vercelEnv'
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -72,7 +73,13 @@ async function writeResponse(response: Response, res: ServerResponse) {
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
-    await writeResponse(await apiFetch(await toRequest(req)), res)
+    const request = await toRequest(req)
+    const url = new URL(request.url)
+    const response =
+      url.pathname === VERCEL_SEED_PATH
+        ? await handleVercelDemoSeed(url)
+        : await apiFetch(request)
+    await writeResponse(response, res)
   } catch (error) {
     console.error('[vercel-api] unhandled', error)
     if (!res.headersSent) {

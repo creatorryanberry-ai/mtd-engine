@@ -5,8 +5,8 @@
  * - the one web build as static spa pages
  * - a single node function serving every /api route (src/server/vercel-api-entry.ts)
  * - a routing table that sends /api/* to that function and clean urls to html
- * before building it migrates the database (skip with SKIP_DB=1) and, when
- * ENGINE_SEED_EMAIL is set, seeds the demo workspace for that email (idempotent).
+ * before building it migrates the database (skip with SKIP_DB=1). the demo
+ * workspace is seeded afterwards through the function (src/server/vercelDemoSeed.ts).
  */
 
 import {
@@ -35,29 +35,25 @@ const DYNAMIC_DIR = '__pages'
 
 type Route = Record<string, unknown> & { src?: string; dest?: string; handle?: string }
 
-async function migrateAndSeed() {
+async function migrate() {
   if (!process.env.DATABASE_URL) {
     throw new Error(
       'DATABASE_URL is not set: connect a postgres database to the vercel project',
     )
   }
-  // the function region should match this; the host name encodes it
-  const dbRegion = new URL(process.env.DATABASE_URL).hostname
-    .split('.')
-    .slice(1, 2)
-    .join('')
-  console.info(`[vercel] running migrations (database region: ${dbRegion || 'unknown'})`)
+  console.info(`[vercel] running migrations (database region: ${databaseRegion()})`)
   await $`bun run src/database/migrate.ts`
     .cwd(ROOT)
     .env({
       ...process.env,
       MIGRATION_TIMEOUT_MS: process.env.MIGRATION_TIMEOUT_MS || '120000',
     })
-  const email = process.env.ENGINE_SEED_EMAIL
-  if (email) {
-    console.info('[vercel] seeding the demo workspace')
-    await $`bun run scripts/db/seed-engine.ts --email ${email}`.cwd(ROOT)
-  }
+}
+
+/** neon hosts look like ep-name.c-2.eu-west-2.aws.neon.tech; the function region should match */
+function databaseRegion() {
+  const host = new URL(process.env.DATABASE_URL ?? '').hostname
+  return host.split('.').find((part) => /^[a-z]{2}-[a-z]+-\d$/.test(part)) ?? 'unknown'
 }
 
 function listHtml(dir: string, out: string[] = []) {
@@ -152,7 +148,8 @@ async function buildApiFunction() {
         launcherType: 'Nodejs',
         shouldAddHelpers: false,
         supportsResponseStreaming: true,
-        maxDuration: 60,
+        // the demo seed endpoint runs for a few minutes
+        maxDuration: 300,
       },
       null,
       2,
@@ -163,7 +160,7 @@ async function buildApiFunction() {
 
 async function main() {
   applyVercelEnv()
-  if (!process.env.SKIP_DB) await migrateAndSeed()
+  if (!process.env.SKIP_DB) await migrate()
 
   console.info('[vercel] building the web app')
   rmSync(OUTPUT, { recursive: true, force: true })
