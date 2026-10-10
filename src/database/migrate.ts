@@ -17,6 +17,8 @@ export async function main() {
   await db.migrate({
     migrations: loadMigrationsFromDir(join(import.meta.dirname, 'migrations')),
     gitSha: process.env.GIT_SHA,
+    // remote databases (e.g. vercel builds) need longer than the 5s default
+    defaultTimeout: Number(process.env.MIGRATION_TIMEOUT_MS) || undefined,
   })
 }
 

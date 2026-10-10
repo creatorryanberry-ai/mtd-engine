@@ -1,14 +1,13 @@
 import { isStagingApiHost } from './isStagingApiHost'
+import { isVercelPreviewHost } from './isVercelPreviewHost'
 
-/** Real production process: production NODE_ENV and not the staging api host. */
+/** Real production process: production NODE_ENV, not the staging api host, not a private vercel preview. */
 export function isRealProductionRuntime(opts: {
   nodeEnv: string | undefined
   betterAuthUrl: string
   apiServerUrl: string
 }): boolean {
   if (opts.nodeEnv !== 'production') return false
-  return !isStagingApiHost({
-    betterAuthUrl: opts.betterAuthUrl,
-    apiServerUrl: opts.apiServerUrl,
-  })
+  const urls = { betterAuthUrl: opts.betterAuthUrl, apiServerUrl: opts.apiServerUrl }
+  return !isStagingApiHost(urls) && !isVercelPreviewHost(urls)
 }

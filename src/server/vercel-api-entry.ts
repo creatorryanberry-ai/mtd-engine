@@ -1,9 +1,10 @@
-// must stay first: sets urls and the direct db connection before ~/env loads
-import './vercelEnv'
-
-import { fetch as apiFetch } from './api-entry'
+import { applyVercelEnv } from './vercelEnv'
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
+
+// urls and the direct db connection must be set before ~/env loads
+applyVercelEnv()
+const { fetch: apiFetch } = await import('./api-entry')
 
 /**
  * single vercel node function serving every /api route through the same

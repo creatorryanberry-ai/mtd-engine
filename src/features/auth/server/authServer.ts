@@ -163,6 +163,10 @@ export const authServer = betterAuth({
 
         storeOTP(email, otp)
 
+        // the demo code is fixed and known, so there is nothing to deliver
+        if (isDemoAuthAllowed() && email.toLowerCase() === DEMO_EMAIL.toLowerCase())
+          return
+
         if (!isEmailConfigured()) {
           if (process.env.NODE_ENV === 'production' && !process.env.IS_TESTING) {
             throw new Error('Email is not configured (set POSTMARK_SERVER_TOKEN)')

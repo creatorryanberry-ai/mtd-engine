@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { assertDemoAuthFlagsSafe } from '~/features/auth/server/assertDemoAuthFlagsSafe'
 import { isRealProductionRuntime } from '~/features/auth/server/isRealProductionRuntime'
 import { isStagingApiHost } from '~/features/auth/server/isStagingApiHost'
+import { isVercelPreviewHost } from '~/features/auth/server/isVercelPreviewHost'
 
 describe('isStagingApiHost', () => {
   it('detects staging-api in either url', () => {
@@ -30,6 +31,31 @@ describe('isStagingApiHost', () => {
   })
 })
 
+describe('isVercelPreviewHost', () => {
+  it('is true only when both urls are on vercel.app', () => {
+    const preview = 'https://mtd-engine-team.vercel.app'
+    expect(isVercelPreviewHost({ betterAuthUrl: preview, apiServerUrl: preview })).toBe(
+      true,
+    )
+    expect(
+      isVercelPreviewHost({
+        betterAuthUrl: preview,
+        apiServerUrl: 'https://api.straightup.tax',
+      }),
+    ).toBe(false)
+  })
+
+  it('matches the hostname, not a substring', () => {
+    const lookalike = 'https://app.vercel.app.straightup.tax'
+    expect(
+      isVercelPreviewHost({ betterAuthUrl: lookalike, apiServerUrl: lookalike }),
+    ).toBe(false)
+    expect(
+      isVercelPreviewHost({ betterAuthUrl: 'not a url', apiServerUrl: 'not a url' }),
+    ).toBe(false)
+  })
+})
+
 describe('isRealProductionRuntime', () => {
   it('is false outside production NODE_ENV', () => {
     expect(
@@ -47,6 +73,16 @@ describe('isRealProductionRuntime', () => {
         nodeEnv: 'production',
         betterAuthUrl: 'https://staging-api.straightup.tax',
         apiServerUrl: 'https://staging-api.straightup.tax',
+      }),
+    ).toBe(false)
+  })
+
+  it('is false for a private vercel preview in production mode', () => {
+    expect(
+      isRealProductionRuntime({
+        nodeEnv: 'production',
+        betterAuthUrl: 'https://mtd-engine-team.vercel.app',
+        apiServerUrl: 'https://mtd-engine-team.vercel.app',
       }),
     ).toBe(false)
   })

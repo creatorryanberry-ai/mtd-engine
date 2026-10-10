@@ -9,8 +9,6 @@
  * ENGINE_SEED_EMAIL is set, seeds the demo workspace for that email (idempotent).
  */
 
-import '../../src/server/vercelEnv'
-
 import {
   existsSync,
   mkdirSync,
@@ -24,6 +22,8 @@ import {
 import { dirname, join, relative } from 'node:path'
 
 import { $ } from 'bun'
+
+import { applyVercelEnv } from '../../src/server/vercelEnv'
 
 const ROOT = join(import.meta.dir, '../..')
 const OUTPUT = join(ROOT, '.vercel/output')
@@ -41,8 +41,18 @@ async function migrateAndSeed() {
       'DATABASE_URL is not set: connect a postgres database to the vercel project',
     )
   }
-  console.info('[vercel] running migrations')
-  await $`bun run src/database/migrate.ts`.cwd(ROOT)
+  // the function region should match this; the host name encodes it
+  const dbRegion = new URL(process.env.DATABASE_URL).hostname
+    .split('.')
+    .slice(1, 2)
+    .join('')
+  console.info(`[vercel] running migrations (database region: ${dbRegion || 'unknown'})`)
+  await $`bun run src/database/migrate.ts`
+    .cwd(ROOT)
+    .env({
+      ...process.env,
+      MIGRATION_TIMEOUT_MS: process.env.MIGRATION_TIMEOUT_MS || '120000',
+    })
   const email = process.env.ENGINE_SEED_EMAIL
   if (email) {
     console.info('[vercel] seeding the demo workspace')
@@ -152,6 +162,7 @@ async function buildApiFunction() {
 }
 
 async function main() {
+  applyVercelEnv()
   if (!process.env.SKIP_DB) await migrateAndSeed()
 
   console.info('[vercel] building the web app')
